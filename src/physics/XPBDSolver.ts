@@ -9,7 +9,13 @@ export interface SolverParams {
   compliance: number;
   bendingStiffness: number;
   iterations: number;
+  /** Project particles above y = floorOffset when true. */
+  floorCollision: boolean;
+  floorOffset: number;
 }
+
+/** Tangential velocity retained per step while in floor contact (friction). */
+const FLOOR_FRICTION_KEEP = 0.6;
 
 /** Maps 0..1 stiffness to XPBD compliance (m/N), logarithmically. */
 export function bendingCompliance(stiffness: number): number {
@@ -110,12 +116,25 @@ export class XPBDSolver {
     for (let it = 0; it < p.iterations; it++) {
       for (const c of this.distance) c.solve(pos, invMass, h);
       for (const c of this.bending) c.solve(pos, invMass, h);
+      if (p.floorCollision) this.projectFloor(pos, p.floorOffset);
     }
+    if (p.floorCollision) this.projectFloor(pos, p.floorOffset);
 
     // --- Velocity reconstruction ---
     const invH = 1 / h;
     for (let i = 0; i < n * 3; i++) {
       vel[i] = (pos[i] - prev[i]) * invH;
+    }
+
+    // Floor friction: damp tangential velocity of contacting particles.
+    if (p.floorCollision) {
+      for (let i = 1; i < n - 1; i++) {
+        const i3 = i * 3;
+        if (pos[i3 + 1] <= p.floorOffset + 1e-4) {
+          vel[i3] *= FLOOR_FRICTION_KEEP;
+          vel[i3 + 2] *= FLOOR_FRICTION_KEEP;
+        }
+      }
     }
 
     // --- Sanity check: cheap scan for NaN / explosion ---
@@ -129,6 +148,15 @@ export class XPBDSolver {
         this.unstable = true;
         return;
       }
+    }
+  }
+
+  /** Unilateral floor contact: clamp free particles to y >= offset. */
+  private projectFloor(pos: Float32Array, offset: number): void {
+    const n = this.rope.count;
+    for (let i = 1; i < n - 1; i++) {
+      const i3 = i * 3;
+      if (pos[i3 + 1] < offset) pos[i3 + 1] = offset;
     }
   }
 }

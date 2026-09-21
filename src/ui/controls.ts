@@ -75,6 +75,7 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   world.add(s, "gravity", 0, 20, 0.01).name("Gravity m/s²");
   world.add(s, "simulationSpeed", 0.1, 2, 0.05).name("Sim speed ×");
   world.add(s, "iterations", 4, 64, 1).name("Iterations");
+  world.add(s, "floorCollision").name("床との接触");
 
   const an = gui.addFolder("解析 Analysis");
   an.add(a, "enabled").name("解析 ON");

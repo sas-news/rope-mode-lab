@@ -49,12 +49,21 @@ export class Scene {
     fill.position.set(-7, 5, -6);
     this.scene.add(fill);
 
-    // Ground
+    // Ground — semi-transparent and non-depth-writing so the rope stays
+    // visible even when it dips slightly below the floor plane.
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(24, 48),
-      new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 1 }),
+      new THREE.MeshStandardMaterial({
+        color: 0x11151d,
+        roughness: 1,
+        transparent: true,
+        opacity: 0.45,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.renderOrder = 1;
     this.scene.add(ground);
     const grid = new THREE.GridHelper(24, 24, 0x2a3350, 0x1a2030);
     (grid.material as THREE.Material).transparent = true;

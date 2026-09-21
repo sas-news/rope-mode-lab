@@ -45,6 +45,7 @@ export class LongRopeSimulation {
 
   /** Resets positions & clock without rebuilding constraint topology. */
   reset(): void {
+    const p = this.params;
     this.updateDrivers();
     this.simTime = 0;
     this.accumulator = 0;
@@ -54,6 +55,15 @@ export class LongRopeSimulation {
     this.leftDriver.positionAt(0, a);
     this.rightDriver.positionAt(0, b);
     this.rope.layout(a[0], a[1], a[2], b[0], b[1], b[2]);
+    // Start resting on the floor instead of poking through it.
+    if (p.floorCollision) {
+      const pos = this.rope.positions;
+      for (let i = 1; i < this.rope.count - 1; i++) {
+        const y = i * 3 + 1;
+        if (pos[y] < p.ropeRadius) pos[y] = p.ropeRadius;
+      }
+      this.rope.prevPositions.set(pos);
+    }
   }
 
   /** Syncs driver params (call when drive/rope params changed). */
@@ -120,6 +130,8 @@ export class LongRopeSimulation {
         compliance: p.compliance,
         bendingStiffness: p.bendingStiffness,
         iterations: p.iterations,
+        floorCollision: p.floorCollision,
+        floorOffset: p.ropeRadius,
       },
       this.rope.mass / this.rope.length,
     );

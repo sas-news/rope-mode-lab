@@ -9,6 +9,8 @@ const PARAMS = {
   compliance: 0,
   bendingStiffness: 0,
   iterations: 20,
+  floorCollision: false,
+  floorOffset: 0,
 };
 
 describe("XPBDSolver", () => {
@@ -70,5 +72,30 @@ describe("XPBDSolver", () => {
       worst = Math.max(worst, Math.abs(d - rest) / rest);
     }
     expect(worst).toBeLessThan(0.05); // <5% stretch
+  });
+
+  it("floor collision keeps the rope above y = floorOffset", () => {
+    // Low handles + long rope -> the sag would dive well below y=0.
+    const rope = new Rope(31, 4.0, 1.0);
+    rope.layout(-1, 0.6, 0, 1, 0.6, 0);
+    const solver = new XPBDSolver(rope);
+    const a = [-1, 0.6, 0];
+    const b = [1, 0.6, 0];
+    const off = 0.014;
+    for (let s = 0; s < 600; s++) {
+      solver.step(
+        1 / 240,
+        a,
+        b,
+        { ...PARAMS, gravity: 9.81, damping: 0.5, floorCollision: true, floorOffset: off },
+        0.25,
+      );
+    }
+    expect(solver.unstable).toBe(false);
+    let minY = Infinity;
+    for (let i = 1; i < rope.count - 1; i++) {
+      minY = Math.min(minY, rope.positions[i * 3 + 1]);
+    }
+    expect(minY).toBeGreaterThanOrEqual(off - 1e-6);
   });
 });

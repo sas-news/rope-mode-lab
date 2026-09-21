@@ -40,6 +40,8 @@ export interface SimConfig {
   iterations: number;
   /** Fixed physics timestep in seconds. */
   physicsDt: number;
+  /** Unilateral floor contact at y = ropeRadius. */
+  floorCollision: boolean;
 }
 
 export interface AnalysisConfig {
@@ -93,6 +95,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     simulationSpeed: 1,
     iterations: 30,
     physicsDt: 1 / 240,
+    floorCollision: true,
   },
   analysis: {
     enabled: true,
