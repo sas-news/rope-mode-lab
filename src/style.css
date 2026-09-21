@@ -134,8 +134,9 @@ html, body {
 /* ---------- Sweep result panel ---------- */
 .sweep-panel {
   position: fixed;
-  right: 12px;
-  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 56px;
   width: 376px;
   padding: 8px;
   background: rgba(12, 16, 25, 0.88);
@@ -181,6 +182,6 @@ html, body {
   .hud-panel .blurb { display: none; }
   .stats { font-size: 10px; }
   .hud-hint { display: none; }
-  .sweep-panel { width: 300px; top: auto; bottom: 60px; right: 8px; }
+  .sweep-panel { width: 300px; bottom: 60px; }
   .lil-gui { --width: 250px; }
 }
