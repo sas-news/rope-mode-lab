@@ -32,6 +32,21 @@ export class Rope {
   }
 
   /**
+   * Adds a point weight (おもり) on the particle nearest to `frac` of the
+   * rope length. A nonuniform mass distribution changes the dynamics even
+   * in pure XPBD: the weighted particle resists constraint corrections.
+   */
+  setPointMass(frac: number, extraMassKg: number): number {
+    const n = this.count;
+    const base = this.mass / n;
+    for (let i = 1; i < n - 1; i++) this.invMass[i] = 1 / base;
+    if (extraMassKg <= 0) return -1;
+    const i = Math.min(n - 2, Math.max(1, Math.round(frac * (n - 1))));
+    this.invMass[i] = 1 / (base + extraMassKg);
+    return i;
+  }
+
+  /**
    * Lay the rope between two endpoints with a catenary-like sag (sine shape)
    * whose arc length matches the rope length. This avoids an initial
    * constraint-violation snap when the rope is longer than the handle gap.

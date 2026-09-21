@@ -22,6 +22,8 @@ export class LongRopeSimulation {
   stepsPerSecond = 0;
   /** Set when NaN/Inf/explosion detected; stepping halts until reset. */
   unstable = false;
+  /** Particle index currently carrying the point weight, -1 if off. */
+  pointMassIndex = -1;
 
   private endA = new Float32Array(3);
   private endB = new Float32Array(3);
@@ -64,6 +66,7 @@ export class LongRopeSimulation {
       }
       this.rope.prevPositions.set(pos);
     }
+    this.syncPointMass();
   }
 
   /** Syncs driver params (call when drive/rope params changed). */
@@ -82,9 +85,18 @@ export class LongRopeSimulation {
     r.direction = p.rightDirection;
   }
 
+  /** Applies the optional point weight to the rope's inverse masses. */
+  syncPointMass(): void {
+    const p = this.params;
+    this.pointMassIndex = p.pointMassEnabled
+      ? this.rope.setPointMass(p.pointMassPos, p.pointMassKg)
+      : this.rope.setPointMass(0, 0);
+  }
+
   /** Advance by a wall-clock frame delta (seconds). */
   advance(frameDt: number): void {
     if (this.paused || this.unstable) return;
+    this.syncPointMass();
     const h = this.params.physicsDt;
     this.accumulator += Math.min(frameDt, MAX_ACCUMULATED_TIME) *
       this.params.simulationSpeed;

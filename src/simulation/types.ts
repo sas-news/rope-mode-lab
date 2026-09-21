@@ -35,6 +35,11 @@ export interface SimConfig {
   ropeRadius: number;
   /** Amplitude of the mode-injection "kick" (metres). */
   kickAmplitude: number;
+  /** Optional point weight on the rope (おもり). */
+  pointMassEnabled: boolean;
+  pointMassKg: number;
+  /** Position along the rope, 0..1. */
+  pointMassPos: number;
 
   // --- World / solver ---
   gravity: number;
@@ -130,6 +135,9 @@ export const DEFAULT_CONFIG: AppConfig = {
     bendingStiffness: 0.25,
     ropeRadius: 0.014,
     kickAmplitude: 0.5,
+    pointMassEnabled: false,
+    pointMassKg: 1.0,
+    pointMassPos: 1 / 3,
     gravity: 9.81,
     simulationSpeed: 1,
     iterations: 30,

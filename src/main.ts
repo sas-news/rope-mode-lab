@@ -43,6 +43,7 @@ class App {
   private handleL: THREE.Mesh;
   private handleR: THREE.Mesh;
   private particlePoints: THREE.Points;
+  private massMarker: THREE.Mesh;
 
   private hud: Hud;
   private chart: SweepChart;
@@ -122,6 +123,19 @@ class App {
     this.particlePoints.frustumCulled = false;
     this.particlePoints.visible = false;
     this.scene3d.scene.add(this.particlePoints);
+
+    // Point-weight marker (おもり)
+    this.massMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 18, 12),
+      new THREE.MeshStandardMaterial({
+        color: 0x30364a,
+        roughness: 0.35,
+        metalness: 0.7,
+        emissive: 0x1a0505,
+      }),
+    );
+    this.massMarker.visible = false;
+    this.scene3d.scene.add(this.massMarker);
 
     this.hud = new Hud(document.body, {
       togglePause: () => this.togglePause(),
@@ -406,6 +420,17 @@ class App {
     const e3 = (rope.count - 1) * 3;
     this.handleL.position.set(pos[0], pos[1], pos[2]);
     this.handleR.position.set(pos[e3], pos[e3 + 1], pos[e3 + 2]);
+    const mi = this.sim.pointMassIndex;
+    if (this.config.sim.pointMassEnabled && mi >= 0) {
+      const m3 = mi * 3;
+      this.massMarker.position.set(pos[m3], pos[m3 + 1], pos[m3 + 2]);
+      this.massMarker.scale.setScalar(
+        0.05 + 0.045 * Math.cbrt(this.config.sim.pointMassKg),
+      );
+      this.massMarker.visible = true;
+    } else {
+      this.massMarker.visible = false;
+    }
     this.nodeR.update(
       pos,
       this.nodes.nodes,

@@ -75,6 +75,9 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   rope.add(s, "compliance", 0, 0.002, 0.00005).name("Compliance");
   rope.add(s, "bendingStiffness", 0, 1, 0.01).name("Bending stiff.");
   rope.add(s, "ropeRadius", 0.005, 0.05, 0.001).name("Radius m").onChange(actions.syncVisuals);
+  rope.add(s, "pointMassEnabled").name("おもり ON");
+  rope.add(s, "pointMassKg", 0.05, 10, 0.05).name("おもり kg");
+  rope.add(s, "pointMassPos", 0.02, 0.98, 0.01).name("おもり位置 0-1");
 
   const world = gui.addFolder("世界 World");
   world.add(s, "gravity", 0, 20, 0.01).name("Gravity m/s²");
