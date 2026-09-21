@@ -5,6 +5,7 @@ import { LongRopeSimulation } from "./simulation/LongRopeSimulation";
 import { ModeAnalyzer } from "./analysis/ModeAnalyzer";
 import { NodeDetector } from "./analysis/NodeDetector";
 import { FrequencySweep } from "./analysis/FrequencySweep";
+import { ParamSweep } from "./analysis/ParamSweep";
 import { History } from "./analysis/History";
 import { Scene } from "./rendering/Scene";
 import { RopeRenderer } from "./rendering/RopeRenderer";
@@ -12,6 +13,7 @@ import { NodeRenderer } from "./rendering/NodeRenderer";
 import { TrailRenderer } from "./rendering/TrailRenderer";
 import { Hud, HudStats } from "./ui/hud";
 import { SweepChart } from "./ui/sweepChart";
+import { HeatmapChart } from "./ui/heatmapChart";
 import { buildGUI, refreshGUI } from "./ui/controls";
 import { PRESETS } from "./simulation/presets";
 import {
@@ -23,7 +25,7 @@ import {
   downloadText,
   mergeInto,
 } from "./utils/config";
-import { AppConfig, DEFAULT_CONFIG } from "./simulation/types";
+import { AppConfig, DEFAULT_CONFIG, SweepParamKey } from "./simulation/types";
 
 class App {
   private config: AppConfig;
@@ -31,6 +33,7 @@ class App {
   private analyzer: ModeAnalyzer;
   private nodes: NodeDetector;
   private sweep: FrequencySweep;
+  private paramSweep: ParamSweep;
   private history = new History();
 
   private scene3d: Scene;
@@ -43,12 +46,34 @@ class App {
 
   private hud: Hud;
   private chart: SweepChart;
+  private heatmap: HeatmapChart;
   private gui: GUI;
 
   private last = performance.now();
   private fps = 60;
   private hudTimer = 0;
+  private lastSimTime = 0;
   private suppressHashOnce = false;
+
+  /** SimConfig keys that require rebuilding the rope when changed. */
+  private static readonly STRUCTURAL: ReadonlySet<string> = new Set([
+    "ropeLength",
+    "particleCount",
+    "ropeMass",
+  ]);
+  /** SimConfig keys that live in the end drivers. */
+  private static readonly DRIVE: ReadonlySet<string> = new Set([
+    "frequency",
+    "separateFrequencies",
+    "leftFrequency",
+    "rightFrequency",
+    "phaseDeg",
+    "radius",
+    "leftDirection",
+    "rightDirection",
+    "handleDistance",
+    "handleHeight",
+  ]);
 
   constructor() {
     const container = document.getElementById("app")!;
@@ -59,6 +84,7 @@ class App {
     this.analyzer = new ModeAnalyzer(this.sim.rope.count);
     this.nodes = new NodeDetector(this.sim.rope.count);
     this.sweep = new FrequencySweep(this.config.sweep);
+    this.paramSweep = new ParamSweep(this.config.optimizer);
 
     this.scene3d = new Scene(container);
     this.ropeR = new RopeRenderer(
@@ -105,6 +131,11 @@ class App {
       exportCSV: () => this.toggleRecording(),
     });
     this.chart = new SweepChart(document.body, () => {});
+    this.heatmap = new HeatmapChart(
+      document.body,
+      () => {},
+      (x, y) => this.pickCell(x, y),
+    );
     this.gui = buildGUI(this.config, {
       rebuild: () => this.rebuild(),
       reset: () => this.reset(),
@@ -113,6 +144,10 @@ class App {
       applyPreset: (k) => this.applyPreset(k),
       startSweep: () => this.startSweep(),
       stopSweep: () => this.sweep.stop(),
+      startOptimizer: () => this.startOptimizer(),
+      stopOptimizer: () => this.paramSweep.stop(),
+      applyBestCell: () => this.applyBestCell(),
+      kick: (mode) => this.sim.injectMode(mode, this.config.sim.kickAmplitude),
       exportConfig: () => downloadJSON("rope-mode-lab-config.json", this.config),
       importConfig: () => this.importConfig(),
       shareURL: () => this.shareURL(),
@@ -129,28 +164,48 @@ class App {
 
   // ---------------- actions ----------------
 
-  private rebuild(): void {
+  /** Rebuild rope+analyzers without interrupting a running sweep. */
+  private rebuildRope(): void {
     this.sim.rebuild();
     this.analyzer.resize(this.sim.rope.count);
     this.nodes.resize(this.sim.rope.count);
     this.ropeR.rebuild(this.sim.rope.count, this.config.sim.ropeRadius);
-    this.sweep.stop();
     this.syncDrive();
     this.syncVisuals();
     this.history.reset();
-    // Rebind the debug points to the new rope position buffer.
     this.particlePoints.geometry.setAttribute(
       "position",
       new THREE.BufferAttribute(this.sim.rope.positions, 3),
     );
   }
 
+  private rebuild(): void {
+    this.sweep.stop();
+    this.paramSweep.stop();
+    this.rebuildRope();
+  }
+
   private reset(): void {
     this.sweep.stop();
+    this.paramSweep.stop();
+    this.softReset();
+  }
+
+  /** Reset rope + analysis state without touching params or sweeps. */
+  private softReset(): void {
     this.sim.reset();
     this.analyzer.reset();
     this.nodes.reset();
     this.history.reset();
+  }
+
+  /** Generic param setter used by the optimizer's axes. */
+  private applyParam(key: SweepParamKey, v: number): void {
+    const s = this.config.sim as unknown as Record<string, unknown>;
+    if (typeof s[key] !== "number") return;
+    s[key] = v;
+    if (App.STRUCTURAL.has(key)) this.rebuildRope();
+    else if (App.DRIVE.has(key)) this.syncDrive();
   }
 
   private syncDrive(): void {
@@ -181,6 +236,7 @@ class App {
     if (this.sweep.state === "settling" || this.sweep.state === "measuring") {
       return;
     }
+    this.paramSweep.stop();
     this.config.analysis.enabled = true;
     this.chart.show();
     this.sweep.start(
@@ -192,6 +248,40 @@ class App {
       },
       () => this.chart.draw(this.sweep, [1, 2, 3, 4]),
     );
+  }
+
+  private startOptimizer(): void {
+    if (
+      this.paramSweep.state === "settling" ||
+      this.paramSweep.state === "measuring"
+    ) {
+      return;
+    }
+    this.sweep.stop();
+    this.config.analysis.enabled = true;
+    this.heatmap.show();
+    this.paramSweep.start(
+      (key, v) => {
+        this.applyParam(key, v);
+        refreshGUI(this.gui);
+      },
+      () => this.softReset(),
+      () => this.heatmap.draw(this.paramSweep),
+    );
+  }
+
+  private applyBestCell(): void {
+    const best = this.paramSweep.bestCell();
+    if (!best) return;
+    this.pickCell(best.x, best.y);
+  }
+
+  /** Applies a heatmap cell's params and resets to preview that state. */
+  private pickCell(x: number, y: number): void {
+    this.applyParam(this.config.optimizer.xKey, x);
+    this.applyParam(this.config.optimizer.yKey, y);
+    this.softReset();
+    refreshGUI(this.gui);
   }
 
   private importConfig(): void {
@@ -271,23 +361,28 @@ class App {
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
 
     this.sim.advance(dt);
+    // Elapsed *simulated* time — analysis/sweep timings follow the physics
+    // clock, so simulationSpeed changes don't distort measurements.
+    const simDt = this.sim.simTime - this.lastSimTime;
+    this.lastSimTime = this.sim.simTime;
 
     const rope = this.sim.rope;
     const pos = rope.positions;
     const a = this.config.analysis;
 
-    if (!this.sim.paused && !this.sim.unstable) {
+    if (!this.sim.paused && !this.sim.unstable && simDt > 0) {
       if (a.enabled) {
-        this.analyzer.update(pos, dt, a.maxMode);
+        this.analyzer.update(pos, simDt, a.maxMode);
         if (a.nodeDetection) {
-          this.nodes.update(this.analyzer.fluctMag, dt, a.nodeThreshold);
+          this.nodes.update(this.analyzer.fluctMag, simDt, a.nodeThreshold);
         } else {
           this.nodes.reset();
         }
       }
-      this.sweep.update(dt, this.analyzer, this.nodes.nodes.length);
+      this.sweep.update(simDt, this.analyzer, this.nodes.nodes.length);
+      this.paramSweep.update(simDt, this.analyzer, this.nodes.nodes.length);
       const [fl, fr] = this.sim.currentFrequencies();
-      this.history.push(dt, {
+      this.history.push(simDt, {
         t: this.sim.simTime,
         freqL: fl,
         freqR: fr,
@@ -347,12 +442,31 @@ class App {
       if (this.sweep.state !== "idle") {
         this.chart.draw(this.sweep, [1, 2, 3, 4]);
       }
+      if (this.paramSweep.state !== "idle") {
+        this.heatmap.draw(this.paramSweep);
+      }
     }
 
     this.scene3d.render();
   }
 
   private sweepText(): string {
+    const ps = this.paramSweep;
+    if (ps.state === "settling" || ps.state === "measuring") {
+      const cur = ps.current;
+      return cur
+        ? `Optimizer ${ps.iy * ps.xs.length + ps.ix + 1}/${ps.totalCells} · ` +
+              `${ps.cfg.xKey}=${cur.x.toFixed(2)} ${ps.cfg.yKey}=${cur.y.toFixed(2)} ` +
+              `[${ps.state === "settling" ? "settle" : "measure"}] · ` +
+              `${(ps.progress * 100).toFixed(0)}%`
+        : "";
+    }
+    if (ps.state === "done" && ps.cells.length > 0) {
+      const b = ps.bestCell();
+      return b
+        ? `Optimizer done — best ${ps.cfg.xKey}=${b.x.toFixed(2)} ${ps.cfg.yKey}=${b.y.toFixed(2)}`
+        : "Optimizer done";
+    }
     const s = this.sweep;
     if (s.state === "settling" || s.state === "measuring") {
       const total = s.frequencies.length;

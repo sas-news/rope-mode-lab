@@ -1,5 +1,6 @@
 import GUI from "lil-gui";
 import { AppConfig } from "../simulation/types";
+import { PARAM_LABELS } from "./heatmapChart";
 
 export interface GuiActions {
   /** Structural change: rebuild rope + constraints + renderers. */
@@ -13,6 +14,10 @@ export interface GuiActions {
   applyPreset(key: string): void;
   startSweep(): void;
   stopSweep(): void;
+  startOptimizer(): void;
+  stopOptimizer(): void;
+  applyBestCell(): void;
+  kick(mode: number): void;
   exportConfig(): void;
   importConfig(): void;
   shareURL(): void;
@@ -23,7 +28,7 @@ const DIR_OPTS = { "正転 (+)": 1, "逆転 (−)": -1 } as const;
 
 export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   const gui = new GUI({ title: "Controls", width: 300 });
-  const s = cfg.sim, a = cfg.analysis, sw = cfg.sweep;
+  const s = cfg.sim, a = cfg.analysis, sw = cfg.sweep, op = cfg.optimizer;
 
   const drive = gui.addFolder("駆動 Drive");
   const fShared = drive
@@ -94,6 +99,38 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   sweepF.add(sw, "targetMode", 1, 6, 1).name("Target mode");
   sweepF.add(actions, "startSweep").name("▶ Sweep開始");
   sweepF.add(actions, "stopSweep").name("■ 停止");
+
+  const opt = gui.addFolder("最適化 Optimizer");
+  opt.add(op, "xKey", PARAM_LABELS).name("X軸");
+  opt.add(op, "xStart").name("X start");
+  opt.add(op, "xEnd").name("X end");
+  opt.add(op, "xSteps", 2, 24, 1).name("X steps");
+  opt.add(op, "yKey", PARAM_LABELS).name("Y軸");
+  opt.add(op, "yStart").name("Y start");
+  opt.add(op, "yEnd").name("Y end");
+  opt.add(op, "ySteps", 2, 24, 1).name("Y steps");
+  opt.add(op, "settleTime", 0.5, 10, 0.5).name("Settle s");
+  opt.add(op, "measureTime", 1, 15, 0.5).name("Measure s");
+  opt.add(op, "targetMode", 1, 6, 1).name("Target mode");
+  opt
+    .add(op, "metric", { "振幅 Amp": "amp", "Purity": "purity" } as const)
+    .name("評価指標");
+  opt.add(op, "resetEach").name("各セルでリセット");
+  opt.add(actions, "startOptimizer").name("▶ 最適化開始");
+  opt.add(actions, "stopOptimizer").name("■ 停止");
+  opt.add(actions, "applyBestCell").name("★ 最適セルを適用");
+
+  const kick = gui.addFolder("励起 Kick");
+  kick.add(s, "kickAmplitude", 0.1, 1.5, 0.05).name("振幅 m");
+  kick
+    .add({ k: () => actions.kick(2) }, "k")
+    .name("n=2 注入");
+  kick
+    .add({ k: () => actions.kick(3) }, "k")
+    .name("n=3 注入");
+  kick
+    .add({ k: () => actions.kick(4) }, "k")
+    .name("n=4 注入");
 
   const sys = gui.addFolder("プリセット / 設定");
   sys.add({ normal: () => actions.applyPreset("normal") }, "normal").name("1: Normal");

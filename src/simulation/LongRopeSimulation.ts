@@ -143,4 +143,25 @@ export class LongRopeSimulation {
   currentFrequencies(): [number, number] {
     return [this.leftDriver.frequency, this.rightDriver.frequency];
   }
+
+  /**
+   * Injects a rotating mode-n perturbation: displaces the rope toward
+   * amp·sin(n*pi*x) in the current drive direction and adds the matching
+   * rotational velocity. Used to test whether multi-loop states are stable
+   * attractors even when unreachable from rest by steady driving alone.
+   */
+  injectMode(n: number, amp: number): void {
+    const rope = this.rope;
+    const N = rope.count;
+    const w = 2 * Math.PI * this.leftDriver.frequency;
+    const th = w * this.simTime;
+    for (let i = 1; i < N - 1; i++) {
+      const s = amp * Math.sin((n * Math.PI * i) / (N - 1));
+      const i3 = i * 3;
+      rope.positions[i3 + 1] += s * Math.cos(th);
+      rope.positions[i3 + 2] += s * Math.sin(th);
+      rope.velocities[i3 + 1] += -s * w * Math.sin(th);
+      rope.velocities[i3 + 2] += s * w * Math.cos(th);
+    }
+  }
 }

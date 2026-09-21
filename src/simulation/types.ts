@@ -33,6 +33,8 @@ export interface SimConfig {
   bendingStiffness: number;
   /** Visible rope radius in metres (rendering only). */
   ropeRadius: number;
+  /** Amplitude of the mode-injection "kick" (metres). */
+  kickAmplitude: number;
 
   // --- World / solver ---
   gravity: number;
@@ -65,10 +67,46 @@ export interface SweepConfig {
   targetMode: number;
 }
 
+/** Keys of SimConfig that may be used as sweep axes. */
+export type SweepParamKey =
+  | "frequency"
+  | "phaseDeg"
+  | "radius"
+  | "damping"
+  | "airDrag"
+  | "ropeMass"
+  | "ropeLength"
+  | "handleDistance"
+  | "handleHeight"
+  | "gravity"
+  | "bendingStiffness"
+  | "compliance"
+  | "particleCount"
+  | "iterations";
+
+export interface OptimizerConfig {
+  xKey: SweepParamKey;
+  yKey: SweepParamKey;
+  xStart: number;
+  xEnd: number;
+  xSteps: number;
+  yStart: number;
+  yEnd: number;
+  ySteps: number;
+  settleTime: number;
+  measureTime: number;
+  targetMode: number;
+  /** Objective metric: modal amplitude or purity of targetMode. */
+  metric: "amp" | "purity";
+  /** Reset the rope to the initial layout before every cell. */
+  resetEach: boolean;
+}
+
 export interface AppConfig {
   sim: SimConfig;
   analysis: AnalysisConfig;
   sweep: SweepConfig;
+  optimizer: OptimizerConfig;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -91,6 +129,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     compliance: 0,
     bendingStiffness: 0.25,
     ropeRadius: 0.014,
+    kickAmplitude: 0.5,
     gravity: 9.81,
     simulationSpeed: 1,
     iterations: 30,
@@ -112,5 +151,20 @@ export const DEFAULT_CONFIG: AppConfig = {
     settleTime: 4,
     measureTime: 5,
     targetMode: 3,
+  },
+  optimizer: {
+    xKey: "frequency",
+    yKey: "phaseDeg",
+    xStart: 0.4,
+    xEnd: 4.2,
+    xSteps: 10,
+    yStart: 0,
+    yEnd: 180,
+    ySteps: 7,
+    settleTime: 2.5,
+    measureTime: 3,
+    targetMode: 3,
+    metric: "amp",
+    resetEach: true,
   },
 };
