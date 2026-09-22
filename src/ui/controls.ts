@@ -17,6 +17,8 @@ export interface GuiActions {
   startOptimizer(): void;
   stopOptimizer(): void;
   applyBestCell(): void;
+  /** Configure the optimizer for human-jumpable search and run it. */
+  jumpSearch(): void;
   kick(mode: number): void;
   exportConfig(): void;
   importConfig(): void;
@@ -131,6 +133,7 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
     .add({ phase: "n奇数→0° / 偶数→180°" }, "phase")
     .name("位相(自動)")
     .disable();
+  opt.add(actions, "jumpSearch").name("🧍 跳べる条件を探す");
   opt.add(actions, "startOptimizer").name("▶ 最適化開始");
   opt.add(actions, "stopOptimizer").name("■ 停止");
   opt.add(actions, "applyBestCell").name("★ 最適セルを適用");

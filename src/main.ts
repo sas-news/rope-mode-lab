@@ -178,6 +178,7 @@ class App {
       startOptimizer: () => this.startOptimizer(),
       stopOptimizer: () => this.paramSweep.stop(),
       applyBestCell: () => this.applyBestCell(),
+      jumpSearch: () => this.jumpSearch(),
       kick: (mode) => this.sim.injectMode(mode, this.config.sim.kickAmplitude),
       exportConfig: () => downloadJSON("rope-mode-lab-config.json", this.config),
       importConfig: () => this.importConfig(),
@@ -346,6 +347,31 @@ class App {
     const best = this.paramSweep.bestCell();
     if (!best) return;
     this.pickCell(best.x, best.y);
+  }
+
+  /**
+   * One-click human-jumpable search: frequency is fixed at a realistic
+   * jumping cadence (~1.1 Hz — faster and nobody could keep up), and the
+   * sweep explores the knobs a person can actually adjust — turn radius
+   * and rope length — under the "jump" metric.
+   */
+  private jumpSearch(): void {
+    const op = this.config.optimizer;
+    op.xKey = "radius";
+    op.xStart = 0.3;
+    op.xEnd = 1.0;
+    op.xSteps = 7;
+    op.yKey = "ropeLength";
+    op.yStart = 7.5;
+    op.yEnd = 11;
+    op.ySteps = 5;
+    op.targetMode = 1;
+    op.metric = "jump";
+    this.config.sim.frequency = 1.1;
+    this.config.sim.separateFrequencies = false;
+    this.syncDrive();
+    refreshGUI(this.gui);
+    this.startOptimizer();
   }
 
   /** Applies a heatmap cell's params and resets to preview that state. */

@@ -13,15 +13,16 @@ export interface Preset {
 export const PRESETS: Record<string, Preset> = {
   normal: {
     name: "Normal",
-    description: "Single loop, both hands in phase, gentle frequency.",
+    description:
+      "Single loop, in phase — rope grazes the floor with a person-sized opening.",
     apply(cfg) {
       cfg.sim.frequency = 1.1;
       cfg.sim.separateFrequencies = false;
       cfg.sim.phaseDeg = 0;
-      cfg.sim.radius = 0.35;
+      cfg.sim.radius = 0.85;
       cfg.sim.leftDirection = 1;
       cfg.sim.rightDirection = 1;
-      cfg.sim.ropeLength = 9.0;
+      cfg.sim.ropeLength = 8.5;
       cfg.sim.handleDistance = 7.0;
       cfg.sim.handleHeight = 1.35;
       cfg.sim.damping = 0.35;
@@ -35,10 +36,10 @@ export const PRESETS: Record<string, Preset> = {
       cfg.sim.frequency = 1.1;
       cfg.sim.separateFrequencies = false;
       cfg.sim.phaseDeg = 180;
-      cfg.sim.radius = 0.4;
+      cfg.sim.radius = 0.7;
       cfg.sim.leftDirection = 1;
       cfg.sim.rightDirection = 1;
-      cfg.sim.ropeLength = 9.0;
+      cfg.sim.ropeLength = 8.5;
       cfg.sim.handleDistance = 7.0;
       cfg.sim.damping = 0.3;
       cfg.sim.gravity = 9.81;
