@@ -75,7 +75,6 @@ export interface SweepConfig {
 /** Keys of SimConfig that may be used as sweep axes. */
 export type SweepParamKey =
   | "frequency"
-  | "phaseDeg"
   | "radius"
   | "damping"
   | "airDrag"
@@ -87,19 +86,27 @@ export type SweepParamKey =
   | "bendingStiffness"
   | "compliance"
   | "particleCount"
-  | "iterations";
+  | "iterations"
+  | "physicsDt";
 
 export interface OptimizerConfig {
   xKey: SweepParamKey;
   yKey: SweepParamKey;
+  /** Coarse-pass grid ranges and per-axis cell counts. */
   xStart: number;
   xEnd: number;
   xSteps: number;
   yStart: number;
   yEnd: number;
   ySteps: number;
+  /** Fine-pass grid resolution around the best coarse cell. */
+  fineSteps: number;
+  /** Fine-pass timings (full fidelity). */
   settleTime: number;
   measureTime: number;
+  /** Coarse-pass timings (reduced fidelity — scouting only). */
+  coarseSettleTime: number;
+  coarseMeasureTime: number;
   targetMode: number;
   /** Objective metric: modal amplitude or purity of targetMode. */
   metric: "amp" | "purity";
@@ -162,15 +169,18 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   optimizer: {
     xKey: "frequency",
-    yKey: "phaseDeg",
+    yKey: "handleDistance",
     xStart: 0.4,
     xEnd: 4.2,
-    xSteps: 10,
-    yStart: 0,
-    yEnd: 180,
-    ySteps: 7,
+    xSteps: 7,
+    yStart: 5.5,
+    yEnd: 8.5,
+    ySteps: 5,
+    fineSteps: 5,
     settleTime: 2.5,
     measureTime: 3,
+    coarseSettleTime: 1.2,
+    coarseMeasureTime: 1.5,
     targetMode: 3,
     metric: "amp",
     resetEach: true,

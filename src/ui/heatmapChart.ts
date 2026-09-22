@@ -3,7 +3,6 @@ import { SweepParamKey } from "../simulation/types";
 
 export const PARAM_LABELS: Record<SweepParamKey, string> = {
   frequency: "Freq Hz",
-  phaseDeg: "Phase °",
   radius: "Radius m",
   damping: "Damping",
   airDrag: "AirDrag",
@@ -16,6 +15,7 @@ export const PARAM_LABELS: Record<SweepParamKey, string> = {
   compliance: "Compliance",
   particleCount: "Particles",
   iterations: "Iterations",
+  physicsDt: "Phys dt",
 };
 
 /** Inferno-ish colour map t∈[0,1] -> css rgb. */
@@ -176,8 +176,14 @@ export class HeatmapChart {
     const c = sweep.cfg;
     const metricName = c.metric === "purity" ? "purity" : "amp";
     const done = sweep.state === "done";
+    const stageTag = done
+      ? ""
+      : sweep.stage === "coarse"
+        ? "[粗パス] "
+        : "[精密パス] ";
     this.infoEl.textContent = best
-      ? `${done ? "Best" : "Best so far"}: ${PARAM_LABELS[c.xKey]}=${fmt(best.x)}, ` +
+      ? stageTag +
+        `${done ? "Best" : "Best so far"}: ${PARAM_LABELS[c.xKey]}=${fmt(best.x)}, ` +
         `${PARAM_LABELS[c.yKey]}=${fmt(best.y)} → mode${c.targetMode} ${metricName} ` +
         `${c.metric === "purity" ? (best.metric * 100).toFixed(1) + "%" : best.metric.toFixed(3) + " m"} ` +
         `· nodes≈${best.nodeCount.toFixed(1)} · クリックで適用`

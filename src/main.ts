@@ -5,7 +5,7 @@ import { LongRopeSimulation } from "./simulation/LongRopeSimulation";
 import { ModeAnalyzer } from "./analysis/ModeAnalyzer";
 import { NodeDetector } from "./analysis/NodeDetector";
 import { FrequencySweep } from "./analysis/FrequencySweep";
-import { ParamSweep } from "./analysis/ParamSweep";
+import { ParamSweep, SweepStage } from "./analysis/ParamSweep";
 import { History } from "./analysis/History";
 import { Scene } from "./rendering/Scene";
 import { RopeRenderer } from "./rendering/RopeRenderer";
@@ -55,6 +55,20 @@ class App {
   private hudTimer = 0;
   private lastSimTime = 0;
   private suppressHashOnce = false;
+  /** User fidelity saved while the optimizer's coarse pass runs cheap. */
+  private optFidelity: {
+    particleCount: number;
+    iterations: number;
+    physicsDt: number;
+  } | null = null;
+  /** Reduced-fidelity settings used while scouting the coarse grid. */
+  private static readonly COARSE_FIDELITY = {
+    particleCount: 61,
+    iterations: 14,
+    physicsDt: 1 / 160,
+  };
+  /** Per-frame wall-clock budget for fast-forwarded sweep stepping (ms). */
+  private static readonly FAST_FORWARD_BUDGET_MS = 10;
 
   /** SimConfig keys that require rebuilding the rope when changed. */
   private static readonly STRUCTURAL: ReadonlySet<string> = new Set([
@@ -265,23 +279,62 @@ class App {
   }
 
   private startOptimizer(): void {
-    if (
-      this.paramSweep.state === "settling" ||
-      this.paramSweep.state === "measuring"
-    ) {
-      return;
-    }
+    if (this.paramSweep.running) return;
     this.sweep.stop();
     this.config.analysis.enabled = true;
+    // Phase is not a search axis: it is fixed by the target mode's parity
+    // (odd n → in-phase 0°, even n → counter-phase 180°).
+    this.config.sim.phaseDeg = ParamSweep.phaseForMode(
+      this.config.optimizer.targetMode,
+    );
+    this.config.sim.separateFrequencies = false;
+    this.syncDrive();
     this.heatmap.show();
-    this.paramSweep.start(
-      (key, v) => {
+    this.paramSweep.start({
+      apply: (key, v) => {
         this.applyParam(key, v);
         refreshGUI(this.gui);
       },
-      () => this.softReset(),
-      () => this.heatmap.draw(this.paramSweep),
-    );
+      reset: () => this.softReset(),
+      onStage: (st) => this.setOptimizerStage(st),
+      onDone: () => {
+        this.restoreOptimizerFidelity();
+        this.heatmap.draw(this.paramSweep);
+        refreshGUI(this.gui);
+      },
+    });
+  }
+
+  /**
+   * Swaps solver fidelity when the optimizer switches stages: the coarse
+   * pass scouts with a light rope model, the fine pass restores the user's
+   * full settings for trustworthy measurements.
+   */
+  private setOptimizerStage(stage: SweepStage): void {
+    const s = this.config.sim;
+    if (stage === "coarse") {
+      this.optFidelity = {
+        particleCount: s.particleCount,
+        iterations: s.iterations,
+        physicsDt: s.physicsDt,
+      };
+      const c = App.COARSE_FIDELITY;
+      this.applyParam("particleCount", c.particleCount);
+      this.applyParam("iterations", c.iterations);
+      this.applyParam("physicsDt", c.physicsDt);
+    } else {
+      this.restoreOptimizerFidelity();
+    }
+    refreshGUI(this.gui);
+  }
+
+  private restoreOptimizerFidelity(): void {
+    const f = this.optFidelity;
+    if (!f) return;
+    this.optFidelity = null;
+    this.applyParam("particleCount", f.particleCount);
+    this.applyParam("iterations", f.iterations);
+    this.applyParam("physicsDt", f.physicsDt);
   }
 
   private applyBestCell(): void {
@@ -374,7 +427,17 @@ class App {
     const dt = Math.min(Math.max(rawDt, 0), 0.1);
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
 
-    this.sim.advance(dt);
+    // Sweeps are offline measurements: instead of real-time pacing we burn
+    // a per-frame CPU budget and step physics as fast as possible.
+    const sweeping =
+      this.paramSweep.running ||
+      this.sweep.state === "settling" ||
+      this.sweep.state === "measuring";
+    if (sweeping && !this.sim.paused && !this.sim.unstable) {
+      this.fastForward(App.FAST_FORWARD_BUDGET_MS);
+    } else {
+      this.sim.advance(dt);
+    }
     // Elapsed *simulated* time — analysis/sweep timings follow the physics
     // clock, so simulationSpeed changes don't distort measurements.
     const simDt = this.sim.simTime - this.lastSimTime;
@@ -384,31 +447,8 @@ class App {
     const pos = rope.positions;
     const a = this.config.analysis;
 
-    if (!this.sim.paused && !this.sim.unstable && simDt > 0) {
-      if (a.enabled) {
-        this.analyzer.update(pos, simDt, a.maxMode);
-        if (a.nodeDetection) {
-          this.nodes.update(this.analyzer.fluctMag, simDt, a.nodeThreshold);
-        } else {
-          this.nodes.reset();
-        }
-      }
-      this.sweep.update(simDt, this.analyzer, this.nodes.nodes.length);
-      this.paramSweep.update(simDt, this.analyzer, this.nodes.nodes.length);
-      const [fl, fr] = this.sim.currentFrequencies();
-      this.history.push(simDt, {
-        t: this.sim.simTime,
-        freqL: fl,
-        freqR: fr,
-        dominant: this.analyzer.dominant,
-        purity:
-          this.analyzer.dominant > 0
-            ? this.analyzer.purities[this.analyzer.dominant]
-            : 0,
-        nodeCount: this.nodes.nodes.length,
-        loops: this.nodes.loops,
-        rms: this.analyzer.rms,
-      });
+    if (!sweeping && !this.sim.paused && !this.sim.unstable && simDt > 0) {
+      this.stepAnalysis(simDt);
     }
 
     // --- rendering ---
@@ -475,12 +515,70 @@ class App {
     this.scene3d.render();
   }
 
+  /** Analysis + sweep updates for a chunk of simulated time. */
+  private stepAnalysis(simDt: number): void {
+    const a = this.config.analysis;
+    const pos = this.sim.rope.positions;
+    if (a.enabled) {
+      this.analyzer.update(pos, simDt, a.maxMode);
+      if (a.nodeDetection) {
+        this.nodes.update(this.analyzer.fluctMag, simDt, a.nodeThreshold);
+      } else {
+        this.nodes.reset();
+      }
+    }
+    this.sweep.update(simDt, this.analyzer, this.nodes.nodes.length);
+    this.paramSweep.update(simDt, this.analyzer, this.nodes.nodes.length);
+    const [fl, fr] = this.sim.currentFrequencies();
+    this.history.push(simDt, {
+      t: this.sim.simTime,
+      freqL: fl,
+      freqR: fr,
+      dominant: this.analyzer.dominant,
+      purity:
+        this.analyzer.dominant > 0
+          ? this.analyzer.purities[this.analyzer.dominant]
+          : 0,
+      nodeCount: this.nodes.nodes.length,
+      loops: this.nodes.loops,
+      rms: this.analyzer.rms,
+    });
+  }
+
+  /**
+   * Steps the simulation as fast as the CPU allows within `budgetMs` of
+   * wall-clock time, running analysis per chunk. Used while a sweep is
+   * measuring so grid searches finish in seconds instead of minutes.
+   */
+  private fastForward(budgetMs: number): void {
+    const t0 = performance.now();
+    const CHUNK = 0.05; // sim-seconds per advance call (< maxSteps × dt)
+    while (performance.now() - t0 < budgetMs) {
+      const running =
+        this.paramSweep.running ||
+        this.sweep.state === "settling" ||
+        this.sweep.state === "measuring";
+      if (!running || this.sim.paused) break;
+      if (this.sim.unstable) {
+        // Record the failed cell and keep going (the next cell resets).
+        if (this.paramSweep.running) this.paramSweep.skipCell();
+        else break;
+      }
+      this.sim.advance(CHUNK);
+      const d = this.sim.simTime - this.lastSimTime;
+      this.lastSimTime = this.sim.simTime;
+      if (d <= 0) continue;
+      this.stepAnalysis(d);
+    }
+  }
+
   private sweepText(): string {
     const ps = this.paramSweep;
     if (ps.state === "settling" || ps.state === "measuring") {
       const cur = ps.current;
+      const stageLabel = ps.stage === "coarse" ? "粗" : "精密";
       return cur
-        ? `Optimizer ${ps.iy * ps.xs.length + ps.ix + 1}/${ps.totalCells} · ` +
+        ? `Optimizer[${stageLabel}] ${ps.iy * ps.xs.length + ps.ix + 1}/${ps.totalCells} · ` +
               `${ps.cfg.xKey}=${cur.x.toFixed(2)} ${ps.cfg.yKey}=${cur.y.toFixed(2)} ` +
               `[${ps.state === "settling" ? "settle" : "measure"}] · ` +
               `${(ps.progress * 100).toFixed(0)}%`
