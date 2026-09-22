@@ -1,5 +1,6 @@
 import { ModeAnalyzer } from "./ModeAnalyzer";
 import { SweepConfig } from "../simulation/types";
+import { JumpStats } from "./Clearance";
 
 export interface SweepSample {
   freq: number;
@@ -12,6 +13,10 @@ export interface SweepSample {
   rms: number;
   /** Average detected node count. */
   nodeCount: number;
+  /** Jumpability measured over this frequency's window. */
+  clearance: number;
+  minY: number;
+  contactFrac: number;
 }
 
 export type SweepState = "idle" | "settling" | "measuring" | "done";
@@ -85,8 +90,14 @@ export class FrequencySweep {
 
   /**
    * @param nodeCount current detected node count (0 if detection off)
+   * @param jump optional jumpability tracker, reset at each measure start
    */
-  update(dt: number, analyzer: ModeAnalyzer, nodeCount: number): void {
+  update(
+    dt: number,
+    analyzer: ModeAnalyzer,
+    nodeCount: number,
+    jump?: { reset(): void } & JumpStats,
+  ): void {
     if (this.state === "idle" || this.state === "done") return;
     this.stateTime += dt;
     const freqs = this.frequencies;
@@ -102,6 +113,7 @@ export class FrequencySweep {
       if (this.stateTime >= this.cfg.settleTime) {
         this.state = "measuring";
         this.stateTime = 0;
+        jump?.reset();
         this.ampAcc = new Array(analyzer.maxMode + 1).fill(0);
         this.purAcc = new Array(analyzer.maxMode + 1).fill(0);
         this.dominantHits = new Array(analyzer.maxMode + 1).fill(0);
@@ -142,6 +154,9 @@ export class FrequencySweep {
         dominant: dom,
         rms: this.rmsAcc / s,
         nodeCount: this.nodeSamples > 0 ? this.nodeAcc / this.nodeSamples : 0,
+        clearance: jump?.maxOpening ?? 0,
+        minY: jump?.minY ?? Infinity,
+        contactFrac: jump?.contactFrac ?? 0,
       });
       this.advanceFreq();
     }

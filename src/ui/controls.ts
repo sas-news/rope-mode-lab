@@ -119,8 +119,13 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   opt.add(op, "measureTime", 1, 15, 0.5).name("精密 measure s");
   opt.add(op, "targetMode", 1, 6, 1).name("Target mode");
   opt
-    .add(op, "metric", { "振幅 Amp": "amp", "Purity": "purity" } as const)
+    .add(op, "metric", {
+      "振幅 Amp": "amp",
+      "Purity": "purity",
+      "跳べる度 Jump": "jump",
+    } as const)
     .name("評価指標");
+  opt.add(op, "personHeight", 1.0, 2.2, 0.05).name("身長 m");
   opt.add(op, "resetEach").name("各セルでリセット");
   opt
     .add({ phase: "n奇数→0° / 偶数→180°" }, "phase")

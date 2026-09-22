@@ -108,8 +108,13 @@ export interface OptimizerConfig {
   coarseSettleTime: number;
   coarseMeasureTime: number;
   targetMode: number;
-  /** Objective metric: modal amplitude or purity of targetMode. */
-  metric: "amp" | "purity";
+  /**
+   * Objective metric: modal amplitude, purity, or "jump" — amplitude
+   * gated by floor reach and a person-sized opening.
+   */
+  metric: "amp" | "purity" | "jump";
+  /** Person height the rope opening must clear, in metres. */
+  personHeight: number;
   /** Reset the rope to the initial layout before every cell. */
   resetEach: boolean;
 }
@@ -183,6 +188,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     coarseMeasureTime: 1.5,
     targetMode: 3,
     metric: "amp",
+    personHeight: 1.7,
     resetEach: true,
   },
 };

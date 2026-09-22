@@ -181,12 +181,16 @@ export class HeatmapChart {
       : sweep.stage === "coarse"
         ? "[粗パス] "
         : "[精密パス] ";
+    const jumpInfo =
+      best && c.metric === "jump"
+        ? ` · 開口${best.clearance.toFixed(2)}m・床接地${(best.contactFrac * 100).toFixed(0)}%`
+        : "";
     this.infoEl.textContent = best
       ? stageTag +
         `${done ? "Best" : "Best so far"}: ${PARAM_LABELS[c.xKey]}=${fmt(best.x)}, ` +
         `${PARAM_LABELS[c.yKey]}=${fmt(best.y)} → mode${c.targetMode} ${metricName} ` +
         `${c.metric === "purity" ? (best.metric * 100).toFixed(1) + "%" : best.metric.toFixed(3) + " m"} ` +
-        `· nodes≈${best.nodeCount.toFixed(1)} · クリックで適用`
+        `· nodes≈${best.nodeCount.toFixed(1)}${jumpInfo} · クリックで適用`
       : "";
   }
 }

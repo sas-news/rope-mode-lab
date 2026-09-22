@@ -18,6 +18,7 @@ const cfg: OptimizerConfig = {
   coarseMeasureTime: 0.1,
   targetMode: 2,
   metric: "amp",
+  personHeight: 1.7,
   resetEach: true,
 };
 
@@ -122,5 +123,40 @@ describe("ParamSweep (coarse→fine)", () => {
     expect(done).toBe(true);
     expect(sw.coarseCells.length).toBe(6);
     expect(sw.coarseCells[0].metric).toBe(-Infinity);
+  });
+
+  it("jump metric gates amplitude by ground reach and clearance", () => {
+    const jumpCfg = { ...cfg, metric: "jump" as const };
+    const current = new Map<SweepParamKey, number>();
+    const sw = new ParamSweep(jumpCfg);
+    // Jumpability stub: rope hovers 0.5 m up with a small opening —
+    // not floor-reaching, not person-sized → metric should be ~0.
+    const jump = {
+      minY: 0.5,
+      maxOpening: 0.6,
+      contactFrac: 0,
+      reset() {
+        this.minY = 0.5;
+        this.maxOpening = 0.6;
+        this.contactFrac = 0;
+      },
+    };
+    let done = false;
+    sw.start({
+      apply: (k, v) => current.set(k, v),
+      reset: () => {},
+      onStage: () => {},
+      onDone: () => (done = true),
+    });
+    for (let i = 0; i < 400 && sw.stage === "coarse" && !done; i++) {
+      sw.update(0.05, makeStub(current), 1, jump);
+    }
+    expect(sw.coarseCells.length).toBe(6);
+    // every coarse cell recorded jump stats and scored ~0 (no floor reach)
+    for (const c of sw.coarseCells) {
+      expect(c.minY).toBeCloseTo(0.5);
+      expect(c.clearance).toBeCloseTo(0.6);
+      expect(c.metric).toBeLessThan(0.01);
+    }
   });
 });

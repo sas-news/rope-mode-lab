@@ -7,6 +7,7 @@ import { NodeDetector } from "./analysis/NodeDetector";
 import { FrequencySweep } from "./analysis/FrequencySweep";
 import { ParamSweep, SweepStage } from "./analysis/ParamSweep";
 import { History } from "./analysis/History";
+import { ClearanceTracker } from "./analysis/Clearance";
 import { Scene } from "./rendering/Scene";
 import { RopeRenderer } from "./rendering/RopeRenderer";
 import { NodeRenderer } from "./rendering/NodeRenderer";
@@ -35,6 +36,7 @@ class App {
   private sweep: FrequencySweep;
   private paramSweep: ParamSweep;
   private history = new History();
+  private clearance: ClearanceTracker;
 
   private scene3d: Scene;
   private ropeR: RopeRenderer;
@@ -100,6 +102,7 @@ class App {
     this.nodes = new NodeDetector(this.sim.rope.count);
     this.sweep = new FrequencySweep(this.config.sweep);
     this.paramSweep = new ParamSweep(this.config.optimizer);
+    this.clearance = new ClearanceTracker(this.sim.rope.count);
 
     this.scene3d = new Scene(container);
     this.ropeR = new RopeRenderer(
@@ -197,6 +200,7 @@ class App {
     this.sim.rebuild();
     this.analyzer.resize(this.sim.rope.count);
     this.nodes.resize(this.sim.rope.count);
+    this.clearance.resize(this.sim.rope.count);
     this.ropeR.rebuild(this.sim.rope.count, this.config.sim.ropeRadius);
     this.syncDrive();
     this.syncVisuals();
@@ -224,6 +228,7 @@ class App {
     this.sim.reset();
     this.analyzer.reset();
     this.nodes.reset();
+    this.clearance.reset();
     this.history.reset();
   }
 
@@ -527,8 +532,14 @@ class App {
         this.nodes.reset();
       }
     }
-    this.sweep.update(simDt, this.analyzer, this.nodes.nodes.length);
-    this.paramSweep.update(simDt, this.analyzer, this.nodes.nodes.length);
+    this.clearance.update(pos, this.sim.rope.count, simDt);
+    this.sweep.update(simDt, this.analyzer, this.nodes.nodes.length, this.clearance);
+    this.paramSweep.update(
+      simDt,
+      this.analyzer,
+      this.nodes.nodes.length,
+      this.clearance,
+    );
     const [fl, fr] = this.sim.currentFrequencies();
     this.history.push(simDt, {
       t: this.sim.simTime,

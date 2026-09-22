@@ -1,4 +1,5 @@
 import { OptimizerConfig, SweepParamKey } from "../simulation/types";
+import { clearanceScore, groundScore, JumpStats } from "./Clearance";
 
 /** Minimal structural view of ModeAnalyzer (also satisfied by test stubs). */
 export interface Metrics {
@@ -20,6 +21,15 @@ export interface GridCell {
   dominant: number;
   rms: number;
   nodeCount: number;
+  /** Jumpability data measured over the cell window. */
+  clearance: number;
+  minY: number;
+  contactFrac: number;
+}
+
+/** What the sweep needs from a ClearanceTracker (stub-friendly). */
+export interface JumpWindow extends JumpStats {
+  reset(): void;
 }
 
 export type ParamSweepState = "idle" | "settling" | "measuring" | "done";
@@ -158,6 +168,9 @@ export class ParamSweep {
     metric: number,
     rms: number,
     nodeCount: number,
+    clearance = 0,
+    minY = Infinity,
+    contactFrac = 0,
   ): void {
     this.cells.push({
       x: this.xsV[this.ix],
@@ -168,6 +181,9 @@ export class ParamSweep {
       dominant,
       rms,
       nodeCount,
+      clearance,
+      minY,
+      contactFrac,
     });
     const [s, m] = this.stageTiming();
     this.doneWork += s + m;
@@ -238,8 +254,12 @@ export class ParamSweep {
     this.onDone();
   }
 
-  /** @param dt simulated seconds elapsed since last call */
-  update(dt: number, m: Metrics, nodeCount: number): void {
+  /**
+   * @param dt simulated seconds elapsed since last call
+   * @param jump optional jumpability tracker — reset at each measure
+   *        window start so stats cover exactly that window
+   */
+  update(dt: number, m: Metrics, nodeCount: number, jump?: JumpWindow): void {
     if (!this.running) return;
     this.stateTime += dt;
     const [settle, measure] = this.stageTiming();
@@ -253,6 +273,7 @@ export class ParamSweep {
       if (this.stateTime >= settle) {
         this.state = "measuring";
         this.stateTime = 0;
+        jump?.reset();
         this.ampAcc = new Array(m.maxMode + 1).fill(0);
         this.purAcc = new Array(m.maxMode + 1).fill(0);
         this.domHits = new Array(m.maxMode + 1).fill(0);
@@ -287,13 +308,30 @@ export class ParamSweep {
           dom = k;
         }
       }
+      const clearance = jump?.maxOpening ?? 0;
+      const minY = jump?.minY ?? Infinity;
+      const contactFrac = jump?.contactFrac ?? 0;
+      let metric: number;
+      if (this.cfg.metric === "purity") {
+        metric = purs[tm];
+      } else if (this.cfg.metric === "jump") {
+        metric =
+          amps[tm] *
+          groundScore(minY, 0, contactFrac) *
+          clearanceScore(clearance, this.cfg.personHeight);
+      } else {
+        metric = amps[tm];
+      }
       this.pushCell(
         amps,
         purs,
         dom,
-        this.cfg.metric === "purity" ? purs[tm] : amps[tm],
+        metric,
         this.rmsAcc / this.n,
         this.nodeSamples > 0 ? this.nodeAcc / this.nodeSamples : 0,
+        clearance,
+        minY,
+        contactFrac,
       );
       this.advanceCell();
     }
