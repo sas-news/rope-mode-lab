@@ -144,6 +144,7 @@ export class LongRopeSimulation {
         iterations: p.iterations,
         floorCollision: p.floorCollision,
         floorOffset: p.ropeRadius,
+        floorFriction: p.floorFriction,
       },
       this.rope.mass / this.rope.length,
     );

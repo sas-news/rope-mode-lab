@@ -11,6 +11,7 @@ const PARAMS = {
   iterations: 20,
   floorCollision: false,
   floorOffset: 0,
+  floorFriction: 0.12,
 };
 
 describe("XPBDSolver", () => {

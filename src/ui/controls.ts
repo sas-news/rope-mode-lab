@@ -86,6 +86,7 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   world.add(s, "simulationSpeed", 0.1, 2, 0.05).name("Sim speed ×");
   world.add(s, "iterations", 4, 64, 1).name("Iterations");
   world.add(s, "floorCollision").name("床との接触");
+  world.add(s, "floorFriction", 0, 1, 0.01).name("床摩擦 μ (0=つるつる)");
 
   const an = gui.addFolder("解析 Analysis");
   an.add(a, "enabled").name("解析 ON");
@@ -154,6 +155,12 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   sys.add({ normal: () => actions.applyPreset("normal") }, "normal").name("1: Normal");
   sys.add({ double: () => actions.applyPreset("double") }, "double").name("2: Double Loop");
   sys.add({ triple: () => actions.applyPreset("triple") }, "triple").name("3: Triple Search");
+  sys
+    .add({ slick: () => actions.applyPreset("slick") }, "slick")
+    .name("4: つるつる床 Slick");
+  sys
+    .add({ sticky: () => actions.applyPreset("sticky") }, "sticky")
+    .name("5: ざらざら床 Sticky");
   sys.add(actions, "reset").name("⟲ Reset (R)");
   sys.add(actions, "exportConfig").name("Export Config JSON");
   sys.add(actions, "importConfig").name("Import Config JSON");

@@ -12,10 +12,25 @@ export interface SolverParams {
   /** Project particles above y = floorOffset when true. */
   floorCollision: boolean;
   floorOffset: number;
+  /** Floor friction, 0 (frictionless) .. 1 (rope sticks on contact). */
+  floorFriction: number;
 }
 
-/** Tangential velocity retained per step while in floor contact (friction). */
-const FLOOR_FRICTION_KEEP = 0.6;
+/**
+ * Tangential decay rate (1/s) at floorFriction = 1. Chosen so a contacting
+ * particle loses its sliding speed within a few milliseconds, which is the
+ * "rope glued to the floor" limit.
+ */
+const FLOOR_FRICTION_RATE = 122.6;
+
+/**
+ * Fraction of tangential velocity a contacting particle keeps over a step
+ * of length h. Rate-based so the result does not depend on the timestep.
+ */
+export function floorFrictionKeep(friction: number, h: number): number {
+  const mu = Math.min(1, Math.max(0, friction));
+  return Math.exp(-FLOOR_FRICTION_RATE * mu * h);
+}
 
 /** Maps 0..1 stiffness to XPBD compliance (m/N), logarithmically. */
 export function bendingCompliance(stiffness: number): number {
@@ -127,12 +142,13 @@ export class XPBDSolver {
     }
 
     // Floor friction: damp tangential velocity of contacting particles.
-    if (p.floorCollision) {
+    if (p.floorCollision && p.floorFriction > 0) {
+      const keep = floorFrictionKeep(p.floorFriction, h);
       for (let i = 1; i < n - 1; i++) {
         const i3 = i * 3;
         if (pos[i3 + 1] <= p.floorOffset + 1e-4) {
-          vel[i3] *= FLOOR_FRICTION_KEEP;
-          vel[i3 + 2] *= FLOOR_FRICTION_KEEP;
+          vel[i3] *= keep;
+          vel[i3 + 2] *= keep;
         }
       }
     }

@@ -49,6 +49,11 @@ export interface SimConfig {
   physicsDt: number;
   /** Unilateral floor contact at y = ropeRadius. */
   floorCollision: boolean;
+  /**
+   * Floor friction while the rope touches the ground: 0 = frictionless
+   * (gym floor / rope slides freely), 1 = the contacting section sticks.
+   */
+  floorFriction: number;
 }
 
 export interface AnalysisConfig {
@@ -83,6 +88,7 @@ export type SweepParamKey =
   | "handleDistance"
   | "handleHeight"
   | "gravity"
+  | "floorFriction"
   | "bendingStiffness"
   | "compliance"
   | "particleCount"
@@ -155,6 +161,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     iterations: 30,
     physicsDt: 1 / 240,
     floorCollision: true,
+    floorFriction: 0.12,
   },
   analysis: {
     enabled: true,

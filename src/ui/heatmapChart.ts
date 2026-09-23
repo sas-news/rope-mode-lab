@@ -11,6 +11,7 @@ export const PARAM_LABELS: Record<SweepParamKey, string> = {
   handleDistance: "Handles m",
   handleHeight: "Height m",
   gravity: "Gravity",
+  floorFriction: "床摩擦 μ",
   bendingStiffness: "BendStiff",
   compliance: "Compliance",
   particleCount: "Particles",
