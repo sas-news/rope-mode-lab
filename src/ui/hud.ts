@@ -84,7 +84,7 @@ export class Hud {
 
     const hint = document.createElement("div");
     hint.className = "hud-hint";
-    hint.innerHTML = `Space: 一時停止 · R: リセット · 1/2/3: プリセット<br/>ドラッグ: 回転 · 右ドラッグ: 移動 · ホイール: ズーム`;
+    hint.innerHTML = `Space: 一時停止 · R: リセット · 1〜5: プリセット<br/>ドラッグ: 回転 · 右ドラッグ: 移動 · ホイール: ズーム`;
     root.appendChild(hint);
   }
 
