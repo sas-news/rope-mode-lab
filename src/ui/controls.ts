@@ -1,6 +1,6 @@
 import GUI from "lil-gui";
 import { AppConfig } from "../simulation/types";
-import { PARAM_LABELS } from "./heatmapChart";
+import { PARAM_OPTIONS } from "./heatmapChart";
 
 export interface GuiActions {
   /** Structural change: rebuild rope + constraints + renderers. */
@@ -107,11 +107,11 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   sweepF.add(actions, "stopSweep").name("■ 停止");
 
   const opt = gui.addFolder("最適化 Optimizer");
-  opt.add(op, "xKey", PARAM_LABELS).name("X軸");
+  opt.add(op, "xKey", PARAM_OPTIONS).name("X軸");
   opt.add(op, "xStart").name("X start");
   opt.add(op, "xEnd").name("X end");
   opt.add(op, "xSteps", 2, 12, 1).name("X 粗分割");
-  opt.add(op, "yKey", PARAM_LABELS).name("Y軸");
+  opt.add(op, "yKey", PARAM_OPTIONS).name("Y軸");
   opt.add(op, "yStart").name("Y start");
   opt.add(op, "yEnd").name("Y end");
   opt.add(op, "ySteps", 2, 12, 1).name("Y 粗分割");

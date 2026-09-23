@@ -19,6 +19,14 @@ export const PARAM_LABELS: Record<SweepParamKey, string> = {
   physicsDt: "Phys dt",
 };
 
+/** lil-gui dropdown options: display label -> stored `SweepParamKey`. */
+export const PARAM_OPTIONS: Record<string, SweepParamKey> = Object.fromEntries(
+  (Object.keys(PARAM_LABELS) as SweepParamKey[]).map((k) => [
+    PARAM_LABELS[k],
+    k,
+  ]),
+);
+
 /** Inferno-ish colour map t∈[0,1] -> css rgb. */
 function heat(t: number): string {
   const stops = [
