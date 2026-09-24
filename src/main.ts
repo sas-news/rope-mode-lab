@@ -446,6 +446,12 @@ class App {
       case "Digit3":
         this.applyPreset("triple");
         break;
+      case "Digit4":
+        this.applyPreset("slick");
+        break;
+      case "Digit5":
+        this.applyPreset("sticky");
+        break;
     }
   }
 

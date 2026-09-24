@@ -27,6 +27,8 @@ export const PRESETS: Record<string, Preset> = {
       cfg.sim.handleHeight = 1.35;
       cfg.sim.damping = 0.35;
       cfg.sim.gravity = 9.81;
+      cfg.sim.floorCollision = true;
+      cfg.sim.floorFriction = 0.12;
     },
   },
   double: {
@@ -43,6 +45,8 @@ export const PRESETS: Record<string, Preset> = {
       cfg.sim.handleDistance = 7.0;
       cfg.sim.damping = 0.3;
       cfg.sim.gravity = 9.81;
+      cfg.sim.floorCollision = true;
+      cfg.sim.floorFriction = 0.12;
     },
   },
   triple: {
@@ -63,9 +67,42 @@ export const PRESETS: Record<string, Preset> = {
       cfg.sim.ropeMass = 2.0;
       cfg.sim.damping = 0.2;
       cfg.sim.gravity = 9.81;
+      cfg.sim.floorCollision = true;
+      cfg.sim.floorFriction = 0.12;
       cfg.sweep.startHz = 1.0;
       cfg.sweep.endHz = 4.5;
       cfg.sweep.targetMode = 3;
+    },
+  },
+  slick: {
+    name: "Slick floor",
+    description:
+      "つるつる床 — near-frictionless ground. Grid search best: the loop keeps a" +
+      " 2.0 m opening and only grazes the floor (~10 % contact).",
+    apply(cfg) {
+      cfg.sim.frequency = 1.0;
+      cfg.sim.separateFrequencies = false;
+      cfg.sim.phaseDeg = 0;
+      cfg.sim.radius = 0.95;
+      cfg.sim.leftDirection = 1;
+      cfg.sim.rightDirection = 1;
+      cfg.sim.ropeLength = 8.5;
+      cfg.sim.handleDistance = 7.0;
+      cfg.sim.handleHeight = 1.35;
+      cfg.sim.damping = 0.35;
+      cfg.sim.gravity = 9.81;
+      cfg.sim.floorCollision = true;
+      cfg.sim.floorFriction = 0.02;
+    },
+  },
+  sticky: {
+    name: "Sticky floor",
+    description:
+      "ざらざら床 — same geometry as Slick with a grabbing ground: the" +
+      " contacting section is pinned and the rope scrapes instead of sliding.",
+    apply(cfg) {
+      PRESETS.slick.apply(cfg);
+      cfg.sim.floorFriction = 0.85;
     },
   },
 };

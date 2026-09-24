@@ -1,6 +1,6 @@
 import GUI from "lil-gui";
 import { AppConfig } from "../simulation/types";
-import { PARAM_LABELS } from "./heatmapChart";
+import { PARAM_OPTIONS } from "./heatmapChart";
 
 export interface GuiActions {
   /** Structural change: rebuild rope + constraints + renderers. */
@@ -86,6 +86,7 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   world.add(s, "simulationSpeed", 0.1, 2, 0.05).name("Sim speed ×");
   world.add(s, "iterations", 4, 64, 1).name("Iterations");
   world.add(s, "floorCollision").name("床との接触");
+  world.add(s, "floorFriction", 0, 1, 0.01).name("床摩擦 μ (0=つるつる)");
 
   const an = gui.addFolder("解析 Analysis");
   an.add(a, "enabled").name("解析 ON");
@@ -106,11 +107,11 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   sweepF.add(actions, "stopSweep").name("■ 停止");
 
   const opt = gui.addFolder("最適化 Optimizer");
-  opt.add(op, "xKey", PARAM_LABELS).name("X軸");
+  opt.add(op, "xKey", PARAM_OPTIONS).name("X軸");
   opt.add(op, "xStart").name("X start");
   opt.add(op, "xEnd").name("X end");
   opt.add(op, "xSteps", 2, 12, 1).name("X 粗分割");
-  opt.add(op, "yKey", PARAM_LABELS).name("Y軸");
+  opt.add(op, "yKey", PARAM_OPTIONS).name("Y軸");
   opt.add(op, "yStart").name("Y start");
   opt.add(op, "yEnd").name("Y end");
   opt.add(op, "ySteps", 2, 12, 1).name("Y 粗分割");
@@ -154,6 +155,12 @@ export function buildGUI(cfg: AppConfig, actions: GuiActions): GUI {
   sys.add({ normal: () => actions.applyPreset("normal") }, "normal").name("1: Normal");
   sys.add({ double: () => actions.applyPreset("double") }, "double").name("2: Double Loop");
   sys.add({ triple: () => actions.applyPreset("triple") }, "triple").name("3: Triple Search");
+  sys
+    .add({ slick: () => actions.applyPreset("slick") }, "slick")
+    .name("4: つるつる床 Slick");
+  sys
+    .add({ sticky: () => actions.applyPreset("sticky") }, "sticky")
+    .name("5: ざらざら床 Sticky");
   sys.add(actions, "reset").name("⟲ Reset (R)");
   sys.add(actions, "exportConfig").name("Export Config JSON");
   sys.add(actions, "importConfig").name("Import Config JSON");
